@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import razorpay
+import random
 
 app = Flask(__name__)
 CORS(app)
@@ -12,6 +13,13 @@ try:
     client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 except Exception as e:
     client = None
+
+# Genuine looking test names database
+TEST_NAMES = [
+    "Akash Mohanty", "Rajesh Kumar Das", "Suman Sharma", 
+    "Priyanka Mishra", "Amit Kumar Pradhan", "Rahul Patnaik",
+    "Deepak Rao", "Subham Naik", "Anjali Choudhury"
+]
 
 @app.route('/')
 def home():
@@ -26,14 +34,11 @@ def verify_upi():
             
         upi_id = str(data.get("upiId")).strip()
         
-        # Validation for bad formats
         if "@" not in upi_id:
             return jsonify({"success": False, "message": "Invalid UPI ID format (@ missing)"})
 
-        # 👑 SMART JUGAD FOR TEST MODE:
-        # Kyunki test mode me Razorpay live call nahi deta, hum local smart simulator use karenge
+        # Agar future me real Live Key daloge to ye real block chalega
         try:
-            # Agar future me aap live key daloge to ye block chalega
             if "live" in RAZORPAY_KEY_ID and client:
                 response = client.vpa.validate({"vpa": upi_id})
                 if response.get("success"):
@@ -42,11 +47,21 @@ def verify_upi():
                         "realBankingName": response.get("customer_name")
                     })
         except Exception:
-            pass # Live verification failed fallback to mock
+            pass
             
-        # Test Key Simulation Response (Server crash hone se bachane ke liye)
-        username = upi_id.split("@")[0].replace(".", " ").replace("_", " ").title()
-        simulated_name = f"{username} [Verified Test Account]"
+        # 👑 FIXED SIMULATOR LOGIC: 
+        # Agar numeric ID ya random merchant id milti hai, toh list se ek real name return karega
+        clean_prefix = upi_id.split("@")[0].replace(".", " ").replace("_", " ").strip()
+        
+        # Check agar prefix sirf number ya alphanumeric code hai
+        if clean_prefix.isalnum() and any(char.isdigit() for char in clean_prefix):
+            # Seed ensure karega ki ek specific UPI ID par hamesha wahi ek naam fix dikhaye!
+            random.seed(upi_id)
+            real_looking_name = random.choice(TEST_NAMES)
+        else:
+            real_looking_name = clean_prefix.title()
+
+        simulated_name = f"{real_looking_name} [Verified Test Account]"
         
         return jsonify({
             "success": True,
@@ -58,3 +73,4 @@ def verify_upi():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
+    
